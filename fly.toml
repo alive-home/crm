@@ -1,0 +1,40 @@
+# Fly.io deployment for the CRM.
+# One machine serves both the built client and the API from the same Bun process.
+#
+# Renaming this does not rename the app on Fly: `fly deploy` targets whatever is named here, so this
+# has to match an app that exists, or the deploy fails with "app not found".
+#
+# It pointed at a differently named app for one day, the one this hostname grew out of, which is not
+# what this is any more. Fly has no rename, so the name was moved the only way it can be: a new app,
+# its own IPs, its own certificate. Nothing of the old one is carried over, including the
+# leftover volume it still had mounted from the days this process kept a local SQLite file.
+app = 'your-app-name'
+primary_region = 'ams'
+
+[build]
+
+[env]
+  PORT = '8080'
+  # No DB_PATH and no volume: this process keeps no local state. The CRM is the hosted Turso
+  # database named by TURSO_DATABASE_URL_CRM, and both it and TURSO_API_KEY_CRM are set as secrets
+  # (`fly secrets set ...`) rather than here, so a machine either has the whole connection or none
+  # of it.
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  # The index is a low-traffic internal tool: let the machine sleep and wake on request.
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    method = 'GET'
+    path = '/health'
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '10s'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

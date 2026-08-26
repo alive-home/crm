@@ -1,0 +1,15 @@
+# Keep the build context small and never ship local state or secrets to the builder.
+node_modules
+dist
+*.db*
+.git
+.alive/
+.uploads/
+.env
+.env.*
+!.env.example
+*.local
+.DS_Store
+
+# Personal writing, gitignored and never needed at runtime. Nothing in the image reads it.
+private/

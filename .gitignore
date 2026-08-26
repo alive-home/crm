@@ -1,0 +1,49 @@
+node_modules
+dist
+dist-ssr
+*.local
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.alive/
+.uploads/
+.env
+.env.temp
+.env.*.local
+
+# There is no local database. The CRM is Turso and nothing in this repo opens a file, so these two
+# lines describe an accident rather than a fixture: a hand-run dump or a debugging copy sitting in
+# the working tree, full of real people, one `git add .` away from a public repo.
+crm-export/
+*.db*
+
+.env.development
+.env.*
+!.env.example
+
+# private/ is a local working directory and it stays out of git.
+#
+# It was tracked once, because what is in it had lived in a single sandbox and been lost, and git was
+# the only durable place going. That is no longer true: it is rows in Turso now, read with
+# `bun scripts/playbook.ts`. Tracking the files as well would be the second copy this project spent a
+# lot of effort ending, and the copy that travels, because it is the one a clone carries.
+#
+# What is in there is not a credential, which is what makes it worse rather than better: a leaked key
+# can be rotated in a minute and a named organisation cannot be unpublished. Nothing reads private/ at
+# runtime, so an empty one breaks nothing.
+private/
+
+# typescript
+*.tsbuildinfo
+
+# claude code (machine-local)
+#
+# settings.json is ignored rather than tracked because it is a permission grant. It allows Bash,
+# Write and Edit without a prompt, which is a reasonable local choice and a bad thing to hand a
+# stranger who clones a public repository and opens an agent in it.
+.claude/settings.json
+.claude/settings.local.json
+.claude/worktrees/

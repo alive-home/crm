@@ -1,0 +1,63 @@
+# A push to main deploys. The gate is the same one the local loop runs -- `bun run check` then
+# `bun run build` -- so a red tree never reaches Fly, and a green one needs nobody to remember
+# to run `fly deploy`.
+#
+# A clone with no FLY_API_TOKEN has nowhere to deploy to, which is the normal state for a fork and
+# not a misconfiguration. It gets the check and the build, and the deploy step says so and stops.
+name: Deploy to Fly
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one halfway: two pushes a minute apart queue up
+# rather than racing each other onto the same machine.
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Check, then deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the version the Dockerfile builds and runs on, so the gate here and the
+      # build on Fly cannot disagree about the toolchain.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.12
+
+      - run: bun install --frozen-lockfile
+
+      # lint (biome + the 300-line cap) and typecheck, in one script.
+      - name: Check
+        run: bun run check
+
+      # Fails here on a type or import error rather than inside the remote builder.
+      - name: Build
+        run: bun run build
+
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+
+      # A missing token otherwise surfaces as an unauthenticated flyctl, which reads like a Fly
+      # outage. Name the missing secret instead.
+      - name: Deploy
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          if [ -z "$FLY_API_TOKEN" ]; then
+            echo "FLY_API_TOKEN is not set on this repository, so there is nothing to deploy to."
+            echo "The check and the build above are the whole gate for a fork."
+            echo "To deploy your own: point fly.toml at your app, create a token with"
+            echo "  fly tokens create deploy -a <your-app>"
+            echo "and add it under Settings > Secrets and variables > Actions."
+            exit 0
+          fi
+          # --yes because CI has nobody to answer a prompt, and flyctl asks one whenever a machine
+          # has drifted from fly.toml. The first time it asked, the deploy failed with "yes flag
+          # must be specified when not running interactively" after a clean build and a full image
+          # push, which reads like a Fly outage rather than a question nobody was there to answer.
+          flyctl deploy --remote-only --yes

@@ -1,0 +1,12 @@
+// Ban TypeScript `as` type assertions. They silently override the checker.
+// Prefer a schema parse (zod), a type guard, or `satisfies`.
+// `as const` is allowed: it narrows to a literal type without unsafely casting.
+language js
+
+`$expr as $type` where {
+  $type <: not r"^const$",
+  register_diagnostic(
+    span = $type,
+    message = "Avoid `as` type assertions. Use a schema parse, a type guard, or `satisfies`. (`as const` is allowed.)"
+  )
+}
