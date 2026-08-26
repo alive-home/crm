@@ -1,0 +1,40 @@
+# The run contract for alive-workspaced, the supervisor that runs this repo inside an Alive
+# workspace. A clone with no supervisor uses `bun run dev` instead, on 3594/4594, so the two
+# never fight over a port.
+schema = 1
+
+[project]
+root = "."
+
+# Each service is its own process with its own port, health probe and log. The supervisor sets
+# PORT on each one, and vite.config.ts and server.ts already read it, so nothing here is duplicated
+# in code.
+
+[dev.services.web]
+command = "vite"
+port = 5173
+health_path = "/"
+kind = "frontend"
+
+[dev.services.api]
+# --watch, because the API is the contract the pages are typed against. Without it an edit under
+# server/ leaves the old router answering while the frontend has already hot-reloaded onto a
+# response shape that no longer exists.
+command = "bun --watch server.ts"
+port = 6173
+health_path = "/health"
+kind = "backend"
+
+[dev.services.api.env]
+# The web service's dev proxy sends /api, /login and /logout to its own port plus 1000, so the
+# router has to bind exactly here.
+API_PORT = "6173"
+
+[setup]
+# Runs before any service starts, on every supervisor boot. `bun install` on a populated lockfile
+# is a no-op in a few hundred milliseconds, so there is no gate in front of it.
+command = "bun install --no-progress"
+timeout_seconds = 180
+
+[setup.produces]
+node_modules = "./node_modules"
