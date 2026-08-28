@@ -6,11 +6,30 @@ import { defineConfig } from "vite"
 const PORT = Number(process.env.PORT) || 3594
 const API_PORT = PORT + 1000
 
+/**
+ * The hosts the dev server will answer to, read rather than written down.
+ *
+ * This was the literal `.example.com`, which named the domain the original deployment served and
+ * nothing a clone ever will. Vite refuses a `Host` it was not told about, and the refusal is a 403
+ * on every request — so a stale literal here is a dev server that boots clean, logs nothing and
+ * serves a blocked-request page instead of the app.
+ *
+ * The Alive workspace hands its hostname over as `ALIVE_PREVIEW_HOST_SUFFIX`, and the service is
+ * reached at `<port>-<suffix>`. It changes every time the sandbox is recreated, which is exactly why
+ * it cannot be committed: a hardcoded sandbox id is a value that is wrong by tomorrow.
+ *
+ * Absent the variable this is empty, and Vite then answers localhost and nothing else. That is the
+ * right default for a plain clone — `bun run dev` binds localhost — and it fails closed rather than
+ * opening the dev server to any Host header that asks.
+ */
+const previewSuffix = process.env.ALIVE_PREVIEW_HOST_SUFFIX
+const allowedHosts = previewSuffix ? [`${PORT}-${previewSuffix}`] : []
+
 export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: PORT,
-    allowedHosts: [".example.com"],
+    allowedHosts,
     hmr: {
       protocol: "wss",
       clientPort: 443,
@@ -46,7 +65,7 @@ export default defineConfig(({ mode }) => ({
   preview: {
     host: "::",
     port: PORT,
-    allowedHosts: [".example.com"],
+    allowedHosts,
   },
   // No `resolve.alias` for `@/`: source imports resolve through the `#/*`
   // subpath declared in package.json `imports`, which Vite and TypeScript
