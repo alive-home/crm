@@ -17,6 +17,28 @@ const TOKEN_VAR = "TURSO_API_KEY_CRM"
 let client: Client | null = null
 
 /**
+ * The configured URL, written the way the libsql client will actually accept it.
+ *
+ * Two shapes arrive here that name a perfectly good database and are refused anyway:
+ *
+ * - **`turso://`**, which is how the vendor's own console and CLI print the connection string. The
+ *   client takes `libsql:`, `ws(s):`, `http(s):` and `file:` and nothing else, so a URL pasted
+ *   straight from the dashboard dies at the first query with `URL_SCHEME_NOT_SUPPORTED`. It is the
+ *   same host over the same protocol under a vendor-branded alias, so the scheme is rewritten.
+ * - **Surrounding whitespace**, from a copy that took the trailing newline with it. That one arrives
+ *   percent-encoded and fails as `"https://….turso.io%20" cannot be parsed as a URL`, which reads
+ *   like a broken database rather than a stray keystroke.
+ *
+ * Neither is a default and neither invents a target: an absent variable still throws below and names
+ * itself. This only accepts *the same database* spelled the way the vendor hands it to you.
+ */
+function resolvedUrl(): string | undefined {
+  const raw = process.env[URL_VAR]?.trim()
+  if (!raw) return undefined
+  return raw.replace(/^turso:\/\//i, "libsql://")
+}
+
+/**
  * Which CRM this process will talk to, for the boot log — `null` when it is not configured.
  *
  * Read on every call rather than captured at import, so it cannot report a value the connection
@@ -24,15 +46,15 @@ let client: Client | null = null
  * there is how you find out at the first request instead of at startup.
  */
 export function crmTarget(): string | null {
-  return process.env[URL_VAR] ?? null
+  return resolvedUrl() ?? null
 }
 
 /** Lazily built so importing this module never throws — the failure surfaces on first query. */
 export function turso(): Client {
   if (client) return client
 
-  const url = process.env[URL_VAR]
-  const authToken = process.env[TOKEN_VAR]
+  const url = resolvedUrl()
+  const authToken = process.env[TOKEN_VAR]?.trim()
 
   const missing = [!url && URL_VAR, !authToken && TOKEN_VAR].filter(name => name !== false)
   if (!url || !authToken) {
